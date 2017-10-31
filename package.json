@@ -13,6 +13,7 @@
     "email-validator": "^1.1.1",
     "express": "^4.16.2",
     "express-rate-limit": "^2.9.0",
+    "http-auth": "^3.2.3",
     "md5": "^2.2.1",
     "mv": "^2.1.1",
     "sendmail": "^1.2.0"
