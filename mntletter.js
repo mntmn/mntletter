@@ -5,6 +5,7 @@ const fs = require('fs')
 const sendmail = require('sendmail')()
 const emailValidator = require('email-validator')
 const RateLimit = require('express-rate-limit')
+const dot = require('dot')
 
 const dbPath = "./db.json"
 const CONFIG = JSON.parse(fs.readFileSync("./config.json"))
@@ -37,6 +38,9 @@ function confirmCode(email) {
 }
 
 function sendEmail(to, subject, body) {
+  console.log("sendEmail to:",to)
+  console.log("sendEmail subject:",subject)
+  console.log("sendEmail body:",body)
   sendmail({
     from: CONFIG.adminEmail,
     to: to,
@@ -71,9 +75,13 @@ app.get('/lists/:list/subscribe', function (req, res) {
     }
     // prevent abuse of subscribe function to spam someone
     if (confirmationRequests[email]<20) {
-      let link = CONFIG.baseUrl+"/lists/"+list+"/confirm?email="+email+"&code="+confirmCode(email)
+      let link = CONFIG.baseUrl+"/lists/"+list.name+"/confirm?email="+email+"&code="+confirmCode(email)
       res.send("Thanks for subscribing. You will receive an email with a confirmation link. Please visit this link to confirm that you really want to subscribe.")
-      let body = 'Hello,\n\nFollow this link to confirm your subscription:\n\n'+link+'\n\nIf you did not intentionally subscribe, please ignore this mail.\n\n'+CONFIG.emailSignature
+      let body = dot.template('Hello,\n\nFollow this link to confirm your subscription:\n\n'+link+'\n\nIf you did not intentionally subscribe, please ignore this mail.\n\n'+CONFIG.emailSignature)({
+        list: list.name,
+        email: email,
+        baseUrl: CONFIG.baseUrl
+      })
       sendEmail(email, "["+list.name+"] Please confirm your subscription", body)
     } else {
       res.status(400).send("Too many subscription requests for this email address.")
@@ -91,7 +99,8 @@ app.get('/lists/:list/confirm', function (req, res) {
   if (!list) {
     res.status(404).send("Invalid list.")
     return
-  } else if (emailValidator.validate(email) && list.subscribers[email] && confirmCode(email) == code) {
+  } else if (emailValidator.validate(email) && !list.subscribers[email] && confirmCode(email) == code) {
+    list.subscribers[email] = {"subscribedAt":new Date().toISOString()}
     saveDB()
     res.send("Thanks for confirming your subscription. You will receive email updates until you opt out.")
   } else {
