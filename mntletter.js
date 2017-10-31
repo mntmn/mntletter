@@ -190,9 +190,14 @@ app.post('/lists/:list/mailings/:id/send', authMiddleware, function (req, res) {
       DB.mailings[mailingId].sentAt = new Date().toISOString()
       saveDB()
       for (var i=0; i<emails.length; i++) {
-        var email = emails[i]
+        let email = emails[i]
         console.log("send to ",email)
-        sendEmail(email, "["+list.name+"] "+subject, body)
+        let fullBody = body+" "+dot.template(CONFIG.emailSignature)({
+          list: list.name,
+          email: email,
+          baseUrl: CONFIG.baseUrl
+        })
+        sendEmail(email, "["+list.name+"] "+subject, fullBody)
       }
       res.send('<h1>Mailing #'+mailingId+' Sent</h1>Mailing sent to '+numSubscribers+' subscribers.')
     }
