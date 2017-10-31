@@ -77,7 +77,7 @@ app.get('/lists/:list/subscribe', function (req, res) {
     if (confirmationRequests[email]<20) {
       let link = CONFIG.baseUrl+"/lists/"+list.name+"/confirm?email="+email+"&code="+confirmCode(email)
       res.send("Thanks for subscribing. You will receive an email with a confirmation link. Please visit this link to confirm that you really want to subscribe.")
-      let body = dot.template('Hello,\n\nFollow this link to confirm your subscription:\n\n'+link+'\n\nIf you did not intentionally subscribe, please ignore this mail.\n\n'+CONFIG.emailSignature)({
+      let body = dot.template('Hello,\r\n\r\nFollow this link to confirm your subscription:\r\n'+link+'\r\n\r\nIf you did not intentionally subscribe, please ignore this mail.\r\n\r\n'+CONFIG.emailSignature)({
         list: list.name,
         email: email,
         baseUrl: CONFIG.baseUrl
