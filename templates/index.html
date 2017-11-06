@@ -1,0 +1,11 @@
+{{#def.header}}
+
+<h2>Available Newsletters</h2>
+
+<ul>
+{{~ it.lists :list}}
+  <li><b>{{=list.title}}</b> &mdash; <a href="/lists/{{=list.name}}/join">subscribe</a></li>
+{{~}}
+</ul>
+
+{{#def.footer}}

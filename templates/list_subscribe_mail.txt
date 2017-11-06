@@ -1,0 +1,6 @@
+Hello,
+
+Follow this link to confirm your subscription to {{=it.listTitle}}:
+{{=it.link}}
+
+If you did not intentionally subscribe, please ignore this mail.

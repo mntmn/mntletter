@@ -29,6 +29,43 @@ var authMiddleware = auth.connect(auth.basic({
   callback(username == CONFIG.adminEmail && password == CONFIG.adminPassword);
 }))
 
+var templates = {
+  "header.html": function(){return ""},
+  "footer.html": function(){return ""},
+
+  "index.html": false,
+  
+  "list_join.html": false,
+  "list_confirm_thanks.html": false,
+  "list_subscribe_thanks.html": false,
+  "list_subscribe_mail.txt": false,
+  "list_unsubscribe_thanks.html": false,
+  
+  "mailings_new.html": false,
+  "mailings_stage.html": false,
+  "mailings_sent.html": false,
+  
+  "error_confirm_invalid.html": false,
+  "error_invalid_list.html": false,
+  "error_subscribe_invalid_email.html": false,
+  "error_too_many_subscriptions.html": false,
+  "error_unsubscribe_invalid.html": false
+}
+
+function initTemplates() {
+  let keys = Object.keys(templates)
+  for (var i=0; i<keys.length; i++) {
+    k = keys[i]
+    content = fs.readFileSync("./templates/"+k)
+    templates[k] = dot.template(content, null, {
+      header: templates["header.html"](),
+      footer: templates["footer.html"]()
+    })
+    console.log("loaded: ",k)
+  }
+  templates["signature.txt"] = dot.template(CONFIG.emailSignature)
+}
+
 var DB = {}
 var confirmationRequests = {}
 
@@ -62,12 +99,29 @@ function sendEmail(to, subject, body) {
   })
 }
 
+app.get('/', function(req, res) {
+  let lists = Object.keys(DB.lists).map(function(k) {
+    let l = DB.lists[k]
+    return {
+      name: l.name,
+      title: l.title
+    }
+  })
+  
+  res.send(templates["index.html"]({
+    lists: lists
+  }))
+})
+
 app.get('/lists/:list/join', function (req, res) {
   let list = DB.lists[req.params["list"]]
-  if (list) {
-    res.send('<html><h1>Subscribe to email updates</h1><form action="subscribe" method="GET"><label>Your email address: <input name="email" type="email"> <input type="submit" value="subscribe"></form></html>')
+  if (!list) {
+    res.status(404).send(templates["error_invalid_list.html"]())
+    return
   } else {
-    res.status(404).send("Invalid list.")
+    res.send(templates["list_join.html"]({
+      listTitle: list.title
+    }))
   }
 })
 
@@ -75,7 +129,7 @@ app.get('/lists/:list/subscribe', function (req, res) {
   let email = req.query["email"]
   let list = DB.lists[req.params["list"]]
   if (!list) {
-    res.status(404).send("Invalid list.")
+    res.status(404).send(templates["error_invalid_list.html"]())
     return
   } else if (emailValidator.validate(email) && !list.subscribers[email]) {
     if (!confirmationRequests[email]) {
@@ -86,19 +140,26 @@ app.get('/lists/:list/subscribe', function (req, res) {
     // prevent abuse of subscribe function to spam someone
     if (confirmationRequests[email]<20) {
       let link = CONFIG.baseUrl+"/lists/"+list.name+"/confirm?email="+email+"&code="+confirmCode(email)
-      res.send("Thanks for subscribing to "+list.title+". You will receive an email with a confirmation link. Please visit this link to confirm that you really want to subscribe.")
+      res.send(templates["list_subscribe_thanks.html"]({
+        listTitle: list.title
+      }))
       
-      let body = dot.template('Hello,\r\n\r\nFollow this link to confirm your subscription to '+list.title+':\r\n'+link+'\r\n\r\nIf you did not intentionally subscribe, please ignore this mail.\r\n\r\n'+CONFIG.emailSignature)({
+      let body = templates["list_subscribe_mail.txt"]({
+        listTitle: list.title,
+        link: link,
+      })
+      body += "\r\n"+templates["signature.txt"]({
         list: list.name,
         email: email,
         baseUrl: CONFIG.baseUrl
       })
+      
       sendEmail(email, "["+list.name+"] Please confirm your subscription", body)
     } else {
-      res.status(400).send("Too many subscription requests for this email address.")
+      res.status(400).send(templates["error_too_many_subscriptions.html"]())
     }
   } else {
-    res.status(400).send("Please provide a valid email address that is not yet subscribed to this list.")
+    res.status(400).send(templates["error_subscribe_invalid_email.html"]())
   }
 })
 
@@ -113,9 +174,9 @@ app.get('/lists/:list/confirm', function (req, res) {
   } else if (emailValidator.validate(email) && !list.subscribers[email] && confirmCode(email) == code) {
     list.subscribers[email] = {"subscribedAt":new Date().toISOString()}
     saveDB()
-    res.send("Thanks for confirming your subscription. You will receive email updates until you opt out.")
+    res.send(templates["list_confirm_thanks.html"]())
   } else {
-    res.status(400).send("Please provide a valid email address and confirmation code.")
+    res.status(400).send(templates["error_subscribe_invalid_email.html"]())
   }
 })
 
@@ -123,31 +184,33 @@ app.get('/lists/:list/unsubscribe', function (req, res) {
   let email = req.query["email"]
   let list = DB.lists[req.params["list"]]
   if (!list) {
-    res.status(404).send("Invalid list.")
+    res.status(404).send(templates["error_invalid_list.html"]())
     return
   } else if (emailValidator.validate(email) && list.subscribers[email]) {
     delete list.subscribers[email]
     saveDB()
-    res.send("Thanks for unsubscribing. You will receive no further emails.")
+    res.send(templates["list_unsubscribe_thanks.html"]())
   } else {
-    res.status(400).send("Please provide a valid email address that is subscribed to this list.")
+    res.status(400).send(templates["error_unsubscribe_invalid.html"]())
   }
 })
 
 app.get('/lists/:list/mailings/new', authMiddleware, function (req, res) {
   let list = DB.lists[req.params["list"]]
   if (!list) {
-    res.status(404).send("Invalid list.")
+    res.status(404).send(templates["error_invalid_list.html"]())
     return
   } else {
-    res.send('<h1>New Mailing to '+list.name+'</h1><form action="./stage" method="POST"><label>ID: <input type="text" name="id"></label><label>Subject: <input type="text" name="subject" autofocus></label><br><textarea name="body" cols=80 rows=32></textarea><br><input type="submit" value="Preview"></form>')
+    res.send(templates["mailings_new.html"]({
+      listName: list.name
+    }))
   }
 })
 
 app.post('/lists/:list/mailings/stage', authMiddleware, function (req, res) {
   let list = DB.lists[req.params["list"]]
   if (!list) {
-    res.status(404).send("Invalid list.")
+    res.status(404).send(templates["error_invalid_list.html"]())
     return
   } else {
     let mailingId = req.body.id
@@ -155,7 +218,12 @@ app.post('/lists/:list/mailings/stage', authMiddleware, function (req, res) {
     let body = req.body.body
     let numSubscribers = Object.keys(list.subscribers).length
 
-    res.send('<h1>Preview of mailing #'+mailingId+'</h1><pre>Subject: '+subject+'\r\n\r\n'+body+'</pre><br><br><form action="./'+mailingId+'/send" method="POST"><input type="submit" name="send" value="Send to '+numSubscribers+' subscribers!"></form>')
+    res.send(templates["mailings_stage.html"]({
+      subject: subject,
+      body: body,
+      numSubscribers: numSubscribers,
+      mailingId: mailingId
+    }))
 
     if (!DB.mailings) DB.mailings = {}
     
@@ -173,7 +241,7 @@ app.post('/lists/:list/mailings/stage', authMiddleware, function (req, res) {
 app.post('/lists/:list/mailings/:id/send', authMiddleware, function (req, res) {
   let list = DB.lists[req.params["list"]]
   if (!list) {
-    res.status(404).send("Invalid list.")
+    res.status(404).send(templates["error_invalid_list.html"]())
     return
   } else {
     let mailingId = req.params.id
@@ -192,18 +260,24 @@ app.post('/lists/:list/mailings/:id/send', authMiddleware, function (req, res) {
       for (var i=0; i<emails.length; i++) {
         let email = emails[i]
         console.log("send to ",email)
-        let fullBody = body+" "+dot.template(CONFIG.emailSignature)({
+        let fullBody = body+" "+templates["signature.txt"]({
           list: list.name,
           email: email,
           baseUrl: CONFIG.baseUrl
         })
         sendEmail(email, "["+list.name+"] "+subject, fullBody)
       }
-      res.send('<h1>Mailing #'+mailingId+' Sent</h1>Mailing sent to '+numSubscribers+' subscribers.')
+      res.send(templates["mailings_sent.html"]({
+        mailingId: mailingId,
+        numSubscribers: numSubscribers
+      }))
     }
   }
 })
 
+// launch ========================================================
+
+initTemplates()
 app.listen(CONFIG.port, function () {
   console.log('mntletter listening on '+CONFIG.port+'.')
   loadDB()

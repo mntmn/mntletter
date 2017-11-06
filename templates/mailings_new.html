@@ -1,0 +1,10 @@
+{{#def.header}}
+  <h2>New Mailing to {{=it.listName}}</h2>
+  <form action="./stage" method="POST">
+    <label>ID: <input type="text" name="id" autofocus required></label>
+    <label>Subject: <input type="text" name="subject" required></label>
+    <br>
+    <textarea name="body" cols=80 rows=32 required></textarea><br>
+    <input type="submit" value="Preview">
+  </form>
+{{#def.footer}}

@@ -1,0 +1,10 @@
+{{#def.header}}
+<h2>Preview of mailing #{{=it.mailingId}}</h2>
+<pre>Subject: {{=it.subject}}
+
+{{=it.body}}</pre>
+<br><br>
+<form action="./{{=it.mailingId}}/send" method="POST">
+  <input type="submit" name="send" value="Send to {{=it.numSubscribers}} subscribers!">
+</form>
+{{#def.footer}}
