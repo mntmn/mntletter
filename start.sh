@@ -1,5 +1,4 @@
 #!/bin/bash
-
-nvm use 8.8
-node mntletter.js
+. $HOME/.nvm/nvm.sh
+nvm run 8.8 mntletter.js
 
